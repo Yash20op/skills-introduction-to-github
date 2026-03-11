@@ -41,7 +41,7 @@ jobs:
         id: detect
         if: github.event_name == 'push'
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD -- 'posts/**.md' | grep -v '_template.md' || true)
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- 'posts/*.md' | grep -v '_template.md' || true)
           echo "files<<EOF" >> "$GITHUB_OUTPUT"
           echo "$CHANGED" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"

@@ -87,9 +87,9 @@ def main() -> None:
 
     post_data = load_post(filepath)
 
-    print(f"Title : {post_data['title']}")
-    print(f"Labels: {', '.join(post_data['labels']) if post_data['labels'] else '(none)'}")
-    print(f"Draft : {post_data['is_draft']}")
+    print(f"{'Title':<7}: {post_data['title']}")
+    print(f"{'Labels':<7}: {', '.join(post_data['labels']) if post_data['labels'] else '(none)'}")
+    print(f"{'Draft':<7}: {post_data['is_draft']}")
 
     result = publish(post_data, blog_id, api_key)
 
