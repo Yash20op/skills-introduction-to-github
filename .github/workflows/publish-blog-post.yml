@@ -1,0 +1,69 @@
+name: Publish Blog Post to Blogger
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "posts/**.md"
+
+  workflow_dispatch:
+    inputs:
+      post_file:
+        description: "Path to the blog post markdown file (e.g. posts/my-post.md)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to Blogger
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install requests python-frontmatter markdown
+
+      - name: Detect changed post files
+        id: detect
+        if: github.event_name == 'push'
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- 'posts/*.md' | grep -v '_template.md' || true)
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Publish changed posts (push trigger)
+        if: github.event_name == 'push' && steps.detect.outputs.files != ''
+        env:
+          BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
+          BLOGGER_API_KEY: ${{ secrets.BLOGGER_API_KEY }}
+        run: |
+          while IFS= read -r file; do
+            if [ -n "$file" ]; then
+              echo "Publishing: $file"
+              python scripts/publish_to_blogger.py "$file"
+            fi
+          done <<< "${{ steps.detect.outputs.files }}"
+
+      - name: Publish specified post (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
+          BLOGGER_API_KEY: ${{ secrets.BLOGGER_API_KEY }}
+        run: |
+          echo "Publishing: ${{ inputs.post_file }}"
+          python scripts/publish_to_blogger.py "${{ inputs.post_file }}"
