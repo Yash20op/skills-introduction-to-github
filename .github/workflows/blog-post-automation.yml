@@ -1,0 +1,117 @@
+name: Blog Post Automation
+
+# This workflow automates the blog post publishing workflow, demonstrating the full
+# GitHub flow: create branch → commit file → open PR → merge.
+#
+# The workflow is designed to work with the "Introduction to GitHub" exercise steps:
+#   Step 1: Creates the 'my-first-branch' branch (triggers Step 1 workflow)
+#   Step 2: Adds PROFILE.md to the branch (triggers Step 2 workflow)
+#   Step 3: Opens a pull request (triggers Step 3 workflow)
+#   Step 4: Merges the pull request (triggers Step 4 workflow)
+#
+# Usage: Trigger manually from the Actions tab.
+
+on:
+  workflow_dispatch:
+    inputs:
+      post_content:
+        description: 'Blog post content for PROFILE.md'
+        required: false
+        default: 'Welcome to my GitHub profile!'
+
+env:
+  POLL_INITIAL_WAIT: 30   # Seconds to wait before starting to poll
+  POLL_INTERVAL: 15       # Seconds between each poll attempt
+  POLL_MAX_ATTEMPTS: 20   # Maximum number of poll attempts (~5.5 minutes total)
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  create_blog_post:
+    name: Automate Blog Post Publishing
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # Step 1: Create the feature branch and push an initial commit.
+      # This triggers the "Step 1 - Create a branch" exercise workflow.
+      - name: Create branch my-first-branch
+        run: |
+          git checkout -b my-first-branch
+          git commit --allow-empty -m "Initialize my-first-branch"
+          git push origin my-first-branch
+
+      # Poll until the Step 1 exercise workflow completes and enables Step 2.
+      - name: Wait for Step 1 workflow to complete
+        run: bash .github/scripts/wait-for-workflow.sh "Step 1" "my-first-branch"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 2: Add PROFILE.md to the branch.
+      # This triggers the "Step 2 - Commit a file" exercise workflow.
+      - name: Add PROFILE.md with blog content
+        run: |
+          printf '%s\n' "$POST_CONTENT" > PROFILE.md
+          git add PROFILE.md
+          git commit -m "Add PROFILE.md"
+          git push origin my-first-branch
+        env:
+          POST_CONTENT: ${{ github.event.inputs.post_content }}
+
+      # Poll until the Step 2 exercise workflow completes and enables Step 3.
+      - name: Wait for Step 2 workflow to complete
+        run: bash .github/scripts/wait-for-workflow.sh "Step 2" "my-first-branch"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 3: Open a pull request for the blog post.
+      # This triggers the "Step 3 - Open a pull request" exercise workflow.
+      - name: Open pull request
+        run: |
+          cat > /tmp/pr_body.md << 'EOF'
+          ## Blog Post Publishing
+
+          This pull request was automatically created by the Blog Post Automation workflow.
+
+          ### What's included
+          - Added `PROFILE.md` with blog post content
+
+          ### Content Preview
+          EOF
+          printf '> %s\n\n' "${POST_CONTENT}" >> /tmp/pr_body.md
+          echo "Merge this pull request to publish the blog post to the main branch." >> /tmp/pr_body.md
+
+          gh pr create \
+            --base main \
+            --head my-first-branch \
+            --title "Add my first file" \
+            --body-file /tmp/pr_body.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          POST_CONTENT: ${{ github.event.inputs.post_content }}
+
+      # Poll until the Step 3 exercise workflow completes and enables Step 4.
+      - name: Wait for Step 3 workflow to complete
+        run: bash .github/scripts/wait-for-workflow.sh "Step 3"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 4: Merge the pull request to publish the blog post.
+      # This triggers the "Step 4 - Merge your pull request" exercise workflow.
+      - name: Merge pull request
+        run: |
+          gh pr merge my-first-branch --merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
